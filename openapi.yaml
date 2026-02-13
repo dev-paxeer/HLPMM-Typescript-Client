@@ -1,0 +1,542 @@
+openapi: 3.0.3
+info:
+  title: SidioraGraph Launchpad API
+  description: |
+    API for bonding curve token launchpads on the PAX blockchain.
+    Provides candles, poolstats, trades, holders, and token resolution.
+  version: 1.0.0
+  contact:
+    name: Sidiora Team
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://us-east-1.ag-v2api.sidiora.xyz
+    description: Production
+
+tags:
+  - name: Candles
+    description: OHLCV price candles for launchpad tokens
+  - name: Launchpads
+    description: Launchpad token info, stats, trades, holders
+  - name: TradingView
+    description: TradingView Universal Data Feed (UDF) endpoints
+  - name: WebSocket
+    description: Real-time WebSocket feeds
+
+paths:
+  /udf/config:
+    get:
+      tags: [TradingView]
+      summary: TradingView UDF configuration
+      operationId: udfConfig
+      responses:
+        '200':
+          description: UDF configuration
+          content:
+            application/json:
+              schema:
+                type: object
+  /udf/time:
+    get:
+      tags: [TradingView]
+      summary: TradingView UDF server time
+      operationId: udfTime
+      responses:
+        '200':
+          description: Server time as Unix seconds (string)
+          content:
+            text/plain:
+              schema:
+                type: string
+  /udf/symbols:
+    get:
+      tags: [TradingView]
+      summary: TradingView UDF symbol resolver
+      operationId: udfSymbols
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Symbol to resolve (e.g. PAX/USD, TOKEN/PAX)
+      responses:
+        '200':
+          description: Symbol info
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Symbol not found
+  /udf/search:
+    get:
+      tags: [TradingView]
+      summary: TradingView UDF symbol search
+      operationId: udfSearch
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+  /udf/history:
+    get:
+      tags: [TradingView]
+      summary: TradingView UDF historical bars (OHLCV)
+      operationId: udfHistory
+      parameters:
+        - name: symbol
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Unix seconds
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Unix seconds
+        - name: resolution
+          in: query
+          required: true
+          schema:
+            type: string
+          description: TradingView resolution (e.g. 1, 5, 15, 60, 1D)
+      responses:
+        '200':
+          description: Historical bars response
+          content:
+            application/json:
+              schema:
+                type: object
+  /ws/prices:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket price feed
+      operationId: wsPrices
+      responses:
+        '101':
+          description: Switching Protocols
+  /ws/trades:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket trade feed
+      operationId: wsTrades
+      parameters:
+        - name: tokens
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Comma-separated token addresses to filter
+      responses:
+        '101':
+          description: Switching Protocols
+  /ws/launchpad/{id}:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket launchpad-specific feed
+      operationId: wsLaunchpad
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        '101':
+          description: Switching Protocols
+  /ws/all:
+    get:
+      tags: [WebSocket]
+      summary: WebSocket combined feed
+      operationId: wsAll
+      responses:
+        '101':
+          description: Switching Protocols
+  /api/launchpad/{contract}/candles:
+    get:
+      tags: [Candles]
+      summary: Get OHLCV candles for a launchpad token
+      operationId: getLaunchpadCandles
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Token contract address (0x...)
+          example: "0xf2053164c1bc13a69f24fdfcceb7ca3a8f764519"
+        - name: timeframe
+          in: query
+          schema:
+            type: string
+            enum: ["1m", "5m", "15m", "1h", "4h", "1d"]
+            default: "1h"
+          description: Candle timeframe
+        - name: from
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Start timestamp (Unix seconds)
+        - name: to
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: End timestamp (Unix seconds)
+      responses:
+        '200':
+          description: Candle data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandleResponse'
+        '500':
+          description: Internal server error
+
+  /api/launchpads/resolve:
+    get:
+      tags: [Launchpads]
+      summary: Resolve a token contract to its launchpad info
+      operationId: resolveLaunchpad
+      parameters:
+        - name: chainId
+          in: query
+          schema:
+            type: integer
+            default: 125
+          description: Chain ID (125 for PAX)
+        - name: contract
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Token contract address
+          example: "0xf2053164c1bc13a69f24fdfcceb7ca3a8f764519"
+      responses:
+        '200':
+          description: Resolved launchpad info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveResponse'
+
+  /api/launchpads/{id}/poolstats:
+    get:
+      tags: [Launchpads]
+      summary: Get pool statistics for a launchpad token
+      operationId: getPoolStats
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Launchpad ID
+      responses:
+        '200':
+          description: Pool statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PoolStatsResponse'
+        '404':
+          description: Launchpad not found
+
+  /api/launchpads/{id}/report:
+    get:
+      tags: [Launchpads]
+      summary: Get trading report for a launchpad token
+      operationId: getLaunchpadReport
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Launchpad ID
+        - name: range
+          in: query
+          schema:
+            type: string
+            enum: ["24h", "7d", "30d"]
+            default: "24h"
+          description: Time range for report
+      responses:
+        '200':
+          description: Trading report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '404':
+          description: Launchpad not found
+
+  /api/launchpads/{id}/trades:
+    get:
+      tags: [Launchpads]
+      summary: Get recent trades for a launchpad token
+      operationId: getLaunchpadTrades
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Launchpad ID
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+            maximum: 100
+          description: Number of trades to return
+      responses:
+        '200':
+          description: List of trades
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradesResponse'
+        '404':
+          description: Launchpad not found
+
+  /api/launchpads/{id}/holders:
+    get:
+      tags: [Launchpads]
+      summary: Get token holders for a launchpad
+      operationId: getLaunchpadHolders
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Launchpad ID
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 200
+            maximum: 1000
+          description: Number of holders to return
+      responses:
+        '200':
+          description: List of holders
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoldersResponse'
+        '404':
+          description: Launchpad not found
+
+components:
+  schemas:
+    CandleResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CandleData'
+
+    CandleData:
+      type: object
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp
+        open:
+          type: string
+          description: Open price
+        high:
+          type: string
+          description: High price
+        low:
+          type: string
+          description: Low price
+        close:
+          type: string
+          description: Close price
+        volume:
+          type: string
+          description: Volume in tokens
+
+    ResolveResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/ResolveData'
+          nullable: true
+
+    ResolveData:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Launchpad ID
+        contract:
+          type: string
+          description: Token contract address
+        chain_id:
+          type: integer
+          description: Chain ID
+        name:
+          type: string
+          description: Token name
+        symbol:
+          type: string
+          description: Token symbol
+        status:
+          type: string
+          enum: ["bonding", "migrating", "trading"]
+          description: Token status
+
+    PoolStatsResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/PoolStatsData'
+
+    PoolStatsData:
+      type: object
+      properties:
+        price_usd:
+          type: string
+          description: Current price in USD
+        price_pax:
+          type: string
+          description: Current price in PAX
+        market_cap_usd:
+          type: string
+          description: Market cap in USD
+        liquidity_usd:
+          type: string
+          description: Liquidity (TVL) in USD
+        volume_24h_usd:
+          type: string
+          description: 24-hour volume in USD
+        price_change_24h:
+          type: string
+          description: 24-hour price change percentage
+        holders_count:
+          type: integer
+          description: Number of token holders
+        total_supply:
+          type: string
+          description: Total token supply
+
+    ReportResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportData'
+
+    ReportData:
+      type: object
+      properties:
+        volume:
+          type: string
+          description: Volume in tokens
+        volume_usd:
+          type: string
+          description: Volume in USD
+        trades_count:
+          type: integer
+          description: Total trades
+        buys_count:
+          type: integer
+          description: Buy trades
+        sells_count:
+          type: integer
+          description: Sell trades
+        unique_traders:
+          type: integer
+          description: Unique trader addresses
+
+    TradesResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TradeData'
+
+    TradeData:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Trade ID
+        tx_hash:
+          type: string
+          description: Transaction hash
+        trade_type:
+          type: string
+          enum: ["buy", "sell"]
+        token_amount:
+          type: string
+          description: Amount of tokens traded
+        pax_amount:
+          type: string
+          description: Amount of PAX traded
+        price_usd:
+          type: string
+          description: Price in USD at time of trade
+        trader:
+          type: string
+          description: Trader address
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp
+
+    HoldersResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/HolderData'
+
+    HolderData:
+      type: object
+      properties:
+        address:
+          type: string
+          description: Holder wallet address
+        balance:
+          type: string
+          description: Token balance
+        percentage:
+          type: string
+          description: Percentage of total supply
