@@ -53,7 +53,7 @@ export interface PlaygroundConfig {
 
 const config: PlaygroundConfig = {
   name: 'SidioraGraph Launchpad API',
-  description: 'API for bonding curve token launchpads on the PAX blockchain.Provides candles, poolstats, trades, holders, and token resolution. ',
+  description: 'API for token Sidiora Launchpad',
   baseUrl: 'https://us-east-1.ag-v2api.sidiora.xyz',
   specPath: './openapi.yaml',
   theme: {
