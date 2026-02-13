@@ -3,9 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'SidioraGraph Launchpad API — Playground',
-  description: 'API for bonding curve token launchpads on the PAX blockchain.
-Provides candles, poolstats, trades, holders, and token resolution.
-',
+  description: 'API for bonding curve token launchpads on the PAX blockchain. Provides candles, poolstats, trades, holders, and token resolution.',
 };
 
 export default function RootLayout({
